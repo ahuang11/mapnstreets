@@ -22,3 +22,14 @@ Powered by OSS:
 and all their supporting dependencies.
 
 ![mapnstreets](https://github.com/ahuang11/mapnstreets/assets/15331990/a3e21155-8a0c-43d0-a3c9-a5e4f82d6966)
+
+## Developers 1-2-3
+
+To create a new environment with all the requirements needed:
+`conda env create -f environment.yml`
+
+Then, run:
+`python download_process.py`
+
+Finally, run:
+`panel serve app.py --autoreload`
