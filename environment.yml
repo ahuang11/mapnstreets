@@ -2,10 +2,13 @@ name: mapnstreet
 channels:
   - conda-forge
 dependencies:
+  # app requirements
   - cartopy
+  # download/process requirements
   - grpcio
   - pip
   - pip:
+    # app requirements
     - panel
     - geoviews
     - holoviews
@@ -14,4 +17,7 @@ dependencies:
     - fugue
     - duckdb
     - fastparquet
+    # download/process requirements
     - ray
+    - bs4
+    - tqdm
