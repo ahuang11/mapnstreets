@@ -1,0 +1,17 @@
+name: mapnstreet
+channels:
+  - conda-forge
+dependencies:
+  - cartopy
+  - grpcio
+  - pip
+  - pip:
+    - panel
+    - geoviews
+    - holoviews
+    - geopandas
+    - shapely
+    - fugue
+    - duckdb
+    - fastparquet
+    - ray
