@@ -3,6 +3,8 @@ import fugue.api as fa
 import geopandas as gpd
 import geoviews as gv
 import panel as pn
+import datasets
+import pyarrow as pa
 from holoviews.streams import RangeXY
 from shapely import wkt
 
@@ -33,7 +35,7 @@ INTRO = """
 """
 
 QUERY_FMT = """
-    df = LOAD "joined/*.parquet"
+    df = CREATE USING load_hf(path="ahuang11/tiger_layer_edges")
     df_sel = SELECT STATEFP, COUNTYFP, FULLNAME, geometry \
         FROM df WHERE FULLNAME == '{{name}}'
 """
@@ -72,6 +74,17 @@ class MapnStreets:
 
         self.holoviews_pane.object *= line_strings * points
 
+    def load_hf(path: str) -> pa.Table:
+        return datasets.load_dataset(path).data
+
+    def serialize_geom(self, df):
+        df["geometry"] = df["geometry"].apply(wkt.loads)
+        gdf = gpd.GeoDataFrame(df)
+        centroids = gdf["geometry"].centroid
+        gdf["Longitude"] = centroids.x
+        gdf["Latitude"] = centroids.y
+        return gdf
+
     def process_name(self, name):
         try:
             name = name.strip()
@@ -85,16 +98,11 @@ class MapnStreets:
             df = fa.as_pandas(
                 fa.fugue_sql(query_fmt, name=name, engine="duckdb", as_local=True)
             )
-            df["geometry"] = df["geometry"].apply(wkt.loads)
-            self.gdf = gpd.GeoDataFrame(df)
-            centroids = self.gdf["geometry"].centroid
-            self.gdf["Longitude"] = centroids.x
-            self.gdf["Latitude"] = centroids.y
+            self.gdf = self.serialize_geom(df)
             county_gdf = self.gdf.drop_duplicates(
                 subset=["STATEFP", "COUNTYFP", "FULLNAME"]
             )
-            records = len(county_gdf)
-            self.records_text.value = f"<h3>{records} records found</h3>"
+            self.records_text.value = f"<h3>{len(county_gdf)} records found</h3>"
             self.tabulator.value = (
                 county_gdf["FULLNAME"]
                 .value_counts()

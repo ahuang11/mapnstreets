@@ -3,7 +3,6 @@ channels:
   - conda-forge
 dependencies:
   - cartopy
-  - grpcio
   - pip
   - pip:
     - panel
@@ -13,5 +12,5 @@ dependencies:
     - shapely
     - fugue
     - duckdb
-    - fastparquet
-    - ray
+    - datasets
+    - pyarrow
