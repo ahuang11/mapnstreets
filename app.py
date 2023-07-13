@@ -1,10 +1,15 @@
+import os
+from pathlib import Path
+from urllib.request import urlretrieve
+
 import cartopy.crs as ccrs
 import fugue.api as fa
 import geopandas as gpd
 import geoviews as gv
 import panel as pn
-import datasets
+import pandas as pd
 import pyarrow as pa
+from datasets import load_dataset_builder
 from holoviews.streams import RangeXY
 from shapely import wkt
 
@@ -13,16 +18,13 @@ pn.extension("tabulator")
 
 INTRO = """
     *Have you ever looked at a street name and wondered how common it is?*
-
     Put your curiosity to rest with MapnStreets! By simply entering a name
     in the provided box, you can discover the prevalence of a street name.
     The map will display the locations of all streets with that name,
     and for more detailed information, you can click on the table to
     highlight their exact whereabouts.
-
     Uses [TIGER/Line® Edges](https://www2.census.gov/geo/tiger/TIGER_RD18/LAYER/EDGES/)
     data provided by the US Census Bureau.
-
     Powered by OSS:
     [Fugue](https://fugue-tutorials.readthedocs.io),
     [Panel](https://panel.holoviz.org/),
@@ -34,11 +36,19 @@ INTRO = """
     and all their supporting dependencies.
 """
 
+DATA_DIR = Path.home() / ".cache" / "huggingface" / "datasets"
+DATA_PATH = DATA_DIR / "edges.parquet"
+
 QUERY_FMT = """
-    df = CREATE USING load_hf(path="ahuang11/tiger_layer_edges")
+    df = LOAD "{{data_path}}"
     df_sel = SELECT STATEFP, COUNTYFP, FULLNAME, geometry \
         FROM df WHERE FULLNAME == '{{name}}'
 """
+
+
+def download_hf(path: str, **kwargs):
+    builder = load_dataset_builder("ahuang11/tiger_layer_edges")
+    builder.download_and_prepare(DATA_PATH, file_format="parquet")
 
 
 class MapnStreets:
@@ -60,6 +70,7 @@ class MapnStreets:
         pn.state.onload(self.onload)
 
     def onload(self):
+        download_hf("ahuang11/tiger_layer_edges")
         self.name_input.param.trigger("value")
 
         range_xy = RangeXY()
@@ -73,9 +84,6 @@ class MapnStreets:
         ).opts(responsive=True)
 
         self.holoviews_pane.object *= line_strings * points
-
-    def load_hf(path: str) -> pa.Table:
-        return datasets.load_dataset(path).data
 
     def serialize_geom(self, df):
         df["geometry"] = df["geometry"].apply(wkt.loads)
@@ -96,7 +104,13 @@ class MapnStreets:
             if name == "%":
                 return
             df = fa.as_pandas(
-                fa.fugue_sql(query_fmt, name=name, engine="duckdb", as_local=True)
+                fa.fugue_sql(
+                    query_fmt,
+                    data_path=str(DATA_PATH.absolute()),
+                    name=name,
+                    engine="duckdb",
+                    as_local=True,
+                )
             )
             self.gdf = self.serialize_geom(df)
             county_gdf = self.gdf.drop_duplicates(
