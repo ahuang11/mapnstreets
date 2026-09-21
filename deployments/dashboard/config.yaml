@@ -6,7 +6,7 @@ name: mapnstreets-dashboard
 port: 8000
 image: python:3.11-trixie
 cpu: 2
-memory: 8192
+memory: 4096
 min_replicas: 1
 max_replicas: 2
 public_access: true
