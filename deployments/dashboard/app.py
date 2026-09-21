@@ -41,6 +41,7 @@ _HERE = Path(__file__).parent
 FLOW = "MapnStreetsFlow"
 LEADERBOARD_SIZE = 15
 BAR_TOP_STATES = 25
+BAR_TOP_SUFFIXES = 20
 MAX_DRAWN = 200_000
 DETAIL_THRESHOLD = 5_000
 MAX_SAMPLES = 10_000
@@ -137,6 +138,27 @@ def _state_bar_config(state_table):
     }
 
 
+def _suffix_bar_config(sel):
+    """ECharts horizontal bar chart of street type suffixes from FULLNAME."""
+    names = sel["FULLNAME"].dropna()
+    suffixes = names.str.rsplit(n=1).str[-1]
+    counts = suffixes.value_counts().head(BAR_TOP_SUFFIXES)
+    labels = list(reversed(counts.index.tolist()))
+    values = list(reversed(counts.values.astype(int).tolist()))
+    return {
+        "tooltip": {"trigger": "axis", "axisPointer": {"type": "shadow"}},
+        "grid": {"left": 80, "right": 40, "top": 10, "bottom": 30},
+        "xAxis": {"type": "value", "splitLine": {"lineStyle": {"color": "#ddd6c3"}}},
+        "yAxis": {"type": "category", "data": labels, "axisLabel": {"fontSize": 11}},
+        "series": [{
+            "type": "bar", "data": values,
+            "itemStyle": {"color": "#6b8e23", "borderRadius": [0, 3, 3, 0]},
+            "barMaxWidth": 18,
+            "label": {"show": True, "position": "right", "fontSize": 10, "color": "#6b6b60"},
+        }],
+    }
+
+
 @dataclass
 class SearchResult:
     total: int
@@ -221,6 +243,10 @@ class MapnStreets(pn.viewable.Viewer):
             {}, sizing_mode="stretch_both", min_height=400,
             options={"replaceMerge": ["series"]},
         )
+        self._suffix_chart = pn.pane.ECharts(
+            {}, sizing_mode="stretch_both", min_height=400,
+            options={"replaceMerge": ["series"]},
+        )
 
         super().__init__(**params)
 
@@ -234,6 +260,7 @@ class MapnStreets(pn.viewable.Viewer):
 
         self._tabs = pmui.Tabs(
             ("By state", self._state_chart),
+            ("By type", self._suffix_chart),
             ("Map", self._map),
             ("Records", self._records_table),
             sizing_mode="stretch_both",
@@ -468,6 +495,7 @@ class MapnStreets(pn.viewable.Viewer):
             self._map.loading = True
             self._records_table.loading = True
             self._state_chart.loading = True
+            self._suffix_chart.loading = True
         try:
             await self._do_search(street)
         except Exception as exc:
@@ -479,6 +507,7 @@ class MapnStreets(pn.viewable.Viewer):
                 self._map.loading = False
                 self._records_table.loading = False
                 self._state_chart.loading = False
+                self._suffix_chart.loading = False
 
     async def _do_search(self, street):
         result = await asyncio.to_thread(self._query, street)
@@ -524,9 +553,11 @@ class MapnStreets(pn.viewable.Viewer):
         with pn.io.hold():
             self._records_table.value = records
             self._state_chart.object = _state_bar_config(state_table)
+            self._suffix_chart.object = _suffix_bar_config(result.sel)
         with pn.io.hold():
             self._records_table.loading = False
             self._state_chart.loading = False
+            self._suffix_chart.loading = False
 
         # Phase 2: full map (background).
         await asyncio.sleep(0)

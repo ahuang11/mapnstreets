@@ -53,7 +53,7 @@ jobs:
           GH_REF: ${{ github.head_ref || github.ref_name }}
           METAFLOW_DEFAULT_METADATA: service
           PYTHONUNBUFFERED: 1
-        run: obproject-deploy
+        run: obproject-deploy --force-upgrade
 
   teardown:
     # When a PR is merged or closed, clean up the branch deploy.
