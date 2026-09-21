@@ -1,0 +1,8 @@
+# Outerbounds project config for MapnStreets.
+#
+# MapnStreets is an atlas of every street name in America. The ingest flow
+# downloads TIGER/Line shapefiles, converts them to sorted parquet on S3, and
+# the dashboard lets users search and visualize any street name nationwide.
+project = "mapnstreets"
+title = "MapnStreets"
+platform = "dev-imp.outerbounds.xyz"

@@ -1,0 +1,15 @@
+# Runtime dependencies for the deployed dashboard on Outerbounds.
+# The flow resolves its own per-step envs via @pypi, so this list is only
+# what the dashboard process imports.
+panel
+panel-material-ui
+holoviews
+datashader
+geopandas
+spatialpandas
+duckdb
+shapely
+pyproj
+param
+metaflow
+outerbounds

@@ -1,35 +1,58 @@
-# mapnstreets
+# MapnStreets
 
-*Have you ever looked at a street name and wondered how common it is?*
+An atlas of every street name in America, built on Metaflow and Panel.
 
-Put your curiosity to rest with MapnStreets! By simply entering a name
-in the provided box, you can discover the prevalence of a street name.
-The map will display the locations of all streets with that name,
-and for more detailed information, you can click on the table to
-highlight their exact whereabouts.
+## What it does
 
-Uses [TIGER/Line® Edges](https://www2.census.gov/geo/tiger/TIGER_RD18/LAYER/EDGES/)
-data provided by the US Census Bureau.
+MapnStreets ingests all ~3,200 TIGER/Line EDGES shapefiles from the US Census
+Bureau, sorts them into a single parquet file keyed by street name, and serves
+a dashboard that lets you search any name and instantly see where it appears
+nationwide.
 
-Powered by OSS:
-[Fugue](https://fugue-tutorials.readthedocs.io),
-[Panel](https://panel.holoviz.org/),
-[GeoPandas](https://geopandas.org/),
-[GeoViews](https://geoviews.org/),
-[Parquet](https://parquet.apache.org/),
-[DuckDB](https://duckdb.org/),
-[Ray](https://ray.io/),
-and all their supporting dependencies.
+## Architecture
 
-![mapnstreets](https://github.com/ahuang11/mapnstreets/assets/15331990/a3e21155-8a0c-43d0-a3c9-a5e4f82d6966)
+```
+┌─────────────────────┐      ┌──────────────────────────┐
+│  MapnStreetsFlow     │      │  Panel dashboard         │
+│  (flows/ingest/)    │      │  (deployments/dashboard/) │
+│                     │      │                          │
+│  download → process │─S3──▶│  DuckDB range reads      │
+│  → sort → upload    │      │  datashader rasterize    │
+└─────────────────────┘      └──────────────────────────┘
+```
 
-## Developers 1-2-3
+**Flow** — downloads TIGER shapefiles in parallel batches, converts to WKB
+parquet parts, then sorts globally on `FULLNAME` so row-group statistics enable
+predicate pushdown. Produces two artifacts: `edges.parquet` (~4 GB, geometry)
+and `name_counts.parquet` (name → count lookup).
 
-To create a new environment with all the requirements needed:
-`conda env create -f environment.yml`
+**Dashboard** — reads the latest successful run's parquet via S3 range requests
+(or a local override). Searches are exact-match or prefix (`Oak*`) on the
+sorted column. Results render as a datashader heatmap, an ECharts bar chart by
+state, and a paginated record table.
 
-Then, run:
-`python download_process.py`
+## Running locally
 
-Finally, run:
-`panel serve app.py --autoreload`
+```bash
+# Run the ingest flow (on Kubernetes via fast-bakery)
+python flows/ingest/flow.py --environment=fast-bakery run --max-num-splits 165
+
+# Run the ingest flow (local, skip pypi_base)
+OBPROJECT_SKIP_PYPI_BASE=1 python flows/ingest/flow.py run --url-limit 5
+
+# Serve the dashboard
+panel serve deployments/dashboard/app.py --dev --show
+
+# Use a local parquet instead of S3
+MAPNSTREETS_LOCAL=/tmp/mapnstreets_edges.parquet panel serve deployments/dashboard/app.py --dev --show
+```
+
+## Scripts
+
+Utility scripts in `scripts/` (not deployed):
+
+- `bench.py` — benchmark storage layouts (sorted vs partitioned vs indexed)
+- `probe_query.py` — diagnose query performance against the run's parquet
+- `probe_s3.py` — verify DuckDB can read S3 with brokered credentials
+- `validate_urls.py` — sanity-check that Census Bureau URLs are live
+- `test.py` — minimal test flow for platform smoke tests

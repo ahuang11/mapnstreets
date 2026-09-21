@@ -1,0 +1,85 @@
+name: Deploy to Outerbounds
+
+# Push to main = production deploy.
+# Push to a branch or PR = branch deploy you can test in isolation.
+# PR close/merge = tear down the branch deploy.
+on:
+  push:
+    branches:
+      - main
+      - 'dev/**'
+      - 'feature/**'
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+
+permissions:
+  id-token: write    # OIDC token for outerbounds service-principal-configure
+  contents: read
+  pull-requests: write
+
+# Never run two deploys at once: they race on Argo templates.
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    # Don't deploy on PR close — that's handled by the teardown job below.
+    if: github.event.action != 'closed'
+    name: Deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # obproject-deploy reads git log for the changelog
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install outerbounds ob-project-utils pyyaml
+
+      - name: Configure Outerbounds
+        run: |
+          outerbounds service-principal-configure \
+            --name mapnstreets-cicd \
+            --deployment-domain dev-imp.outerbounds.xyz \
+            --perimeter default \
+            --github-actions
+
+      - name: Deploy
+        env:
+          GH_REF: ${{ github.head_ref || github.ref_name }}
+          METAFLOW_DEFAULT_METADATA: service
+          PYTHONUNBUFFERED: 1
+        run: obproject-deploy
+
+  teardown:
+    # When a PR is merged or closed, clean up the branch deploy.
+    if: github.event_name == 'pull_request' && github.event.action == 'closed'
+    name: Teardown branch deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install outerbounds ob-project-utils pyyaml
+
+      - name: Configure Outerbounds
+        run: |
+          outerbounds service-principal-configure \
+            --name mapnstreets-cicd \
+            --deployment-domain dev-imp.outerbounds.xyz \
+            --perimeter default \
+            --github-actions
+
+      - name: Teardown
+        env:
+          GH_REF: ${{ github.head_ref }}
+          PYTHONUNBUFFERED: 1
+        run: obproject-deploy --teardown-branch

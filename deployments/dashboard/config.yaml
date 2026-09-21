@@ -1,0 +1,19 @@
+# Outerbounds app config for the MapnStreets dashboard.
+#
+# Commands run from the PROJECT ROOT, not this folder, so the app can import
+# shared code from src/ if needed — hence the full path to app.py below.
+name: mapnstreets-dashboard
+port: 8000
+image: python:3.11-trixie
+cpu: 2
+memory: 8192
+min_replicas: 1
+max_replicas: 2
+public_access: true
+description: "MapnStreets — an atlas of every street name in America"
+
+env:
+  METAFLOW_DEFAULT_METADATA: service
+
+commands:
+- python -m panel serve deployments/dashboard/app.py --port 8000 --address 0.0.0.0 --allow-websocket-origin="*"
