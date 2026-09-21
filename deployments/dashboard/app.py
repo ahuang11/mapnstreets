@@ -201,7 +201,6 @@ class Shell(ReactComponent):
 
     _esm = _HERE / "shell.jsx"
     _stylesheets = [str(_HERE / "shell.css")]
-    _bundle = _HERE / "shell.bundle.js"
 
 
 # ---------------------------------------------------------------------------
